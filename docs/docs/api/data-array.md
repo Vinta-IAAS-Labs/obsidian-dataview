@@ -1,9 +1,9 @@
 # Data Arrays
 
-The general abstraction for lists of results in Dataview is the `DataArray`, which is a proxied array with additional
-functionality. Data arrays support indexing and iteration (via `for` and `for ... of` loops) as per normal arrays, but
+The general representation of result lists in Dataview is the `DataArray`, which is a [proxied](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy) version of the JavaScript array with expanded
+functionality. Data arrays support indexing and iteration (via `for` and `for ... of` loops), like normal arrays do, but
 also include many data manipulation operators like `sort`, `groupBy`, `distinct`, `where`, and so on to make
-manipulating tabular data easy.
+manipulating tabular data easier.
 
 ## Creation
 
@@ -54,7 +54,7 @@ export interface DataArray<T> {
     /** Limit the total number of entries in the array to the given value. */
     limit(count: number): DataArray<T>;
     /**
-     * Take a slice of the array. If `start` is undefined, it is assumed to be 0; if `end` is undefined, it is assumbed
+     * Take a slice of the array. If `start` is undefined, it is assumed to be 0; if `end` is undefined, it is assumed
      * to be the end of the array.
      */
     slice(start?: number, end?: number): DataArray<T>;
@@ -78,7 +78,7 @@ export interface DataArray<T> {
 
     /**
      * Return a sorted array sorted by the given key; an optional comparator can be provided, which will
-     * be used to compare the keys in leiu of the default dataview comparator.
+     * be used to compare the keys in lieu of the default dataview comparator.
      */
     sort<U>(key: ArrayFunc<T, U>, direction?: "asc" | "desc", comparator?: ArrayComparator<U>): DataArray<T>;
 
@@ -109,12 +109,24 @@ export interface DataArray<T> {
     to(key: string): DataArray<any>;
     /**
      * Recursively expand the given key, flattening a tree structure based on the key into a flat array. Useful for handling
-     * heirarchical data like tasks with 'subtasks'.
+     * hierarchical data like tasks with 'subtasks'.
      */
     expand(key: string): DataArray<any>;
 
     /** Run a lambda on each element in the array. */
     forEach(f: ArrayFunc<T, void>): void;
+
+    /** Calculate the sum of the elements in the array. */
+    sum(): number;
+
+    /** Calculate the average of the elements in the array. */
+    avg(): number;
+
+    /** Calculate the minimum of the elements in the array. */
+    min(): number;
+
+    /** Calculate the maximum of the elements in the array. */
+    max(): number;
 
     /** Convert this to a plain javascript array. */
     array(): T[];

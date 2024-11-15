@@ -8,6 +8,8 @@ import { Context } from "./context";
 import { Fields } from "./field";
 import { EXPRESSION } from "./parse";
 import { escapeRegex } from "util/normalize";
+import { DataArray } from "api/data-array";
+import { cyrb53 } from "util/hash";
 
 /**
  * A function implementation which takes in a function context and a variable number of arguments. Throws an error if an
@@ -27,7 +29,7 @@ interface FunctionVariant {
 
 /**
  * Allows for the creation of functions that check the number and type of their arguments, and dispatch
- * to different implemenations based on the types of the inputs.
+ * to different implementations based on the types of the inputs.
  */
 export class FunctionBuilder {
     variants: FunctionVariant[];
@@ -276,6 +278,22 @@ export namespace DefaultFunctions {
 
             return null;
         })
+        .add2("string", "string", (d, f) => {
+            if (f === "x" || f === "X") {
+                let match = NUMBER_REGEX.exec(d);
+                if (match) return DateTime.fromMillis(Number.parseInt(match[0]) * (f === "X" ? 1000 : 1));
+                else {
+                    throw Error("Not a number for format( (${ f }): ${ d }");
+                }
+            } else {
+                let parsedDate = DateTime.fromFormat(d, f);
+                if (parsedDate.isValid) return parsedDate;
+                else {
+                    throw Error(`Can't handle format (${f}) on date string (${d})`);
+                }
+            }
+        })
+        .add2("null", "string", () => null)
         .add1("null", () => null)
         .vectorize(1, [0])
         .build();
@@ -295,6 +313,12 @@ export namespace DefaultFunctions {
     /** Format a date using a luxon/moment-style date format. */
     export const dateformat = new FunctionBuilder("dateformat")
         .add2("date", "string", (date, format) => date.toFormat(format, { locale: currentLocale() }))
+        .add2("null", "string", (_nul, _format) => null)
+        .vectorize(2, [0])
+        .build();
+
+    export const durationformat = new FunctionBuilder("durationformat")
+        .add2("duration", "string", (dur, format) => dur.toFormat(format))
         .add2("null", "string", (_nul, _format) => null)
         .vectorize(2, [0])
         .build();
@@ -319,6 +343,17 @@ export namespace DefaultFunctions {
         .vectorize(1, [0])
         .build();
 
+    /** Format a number using a standard currency format. */
+    export const currencyformat = new FunctionBuilder("currencyformat")
+        .add2("number", "string", (num, format) =>
+            Intl.NumberFormat(currentLocale(), { style: "currency", currency: format }).format(num)
+        )
+        .add2("null", "string", (_nul, _format) => null)
+        .add1("number", num => Intl.NumberFormat(currentLocale(), { style: "currency", currency: "USD" }).format(num))
+        .add1("null", () => null)
+        .vectorize(2, [0])
+        .build();
+
     /**
      * Convert any value to a reasonable internal string representation. Most useful for dates, strings, numbers, and
      * so on.
@@ -336,6 +371,24 @@ export namespace DefaultFunctions {
         .add2("number", "null", n => Math.round(n))
         .add2("null", "*", () => null)
         .vectorize(2, [0])
+        .build();
+
+    export const trunc = new FunctionBuilder("trunc")
+        .add1("number", n => Math.trunc(n))
+        .add1("null", () => null)
+        .vectorize(1, [0])
+        .build();
+
+    export const floor = new FunctionBuilder("floor")
+        .add1("number", n => Math.floor(n))
+        .add1("null", () => null)
+        .vectorize(1, [0])
+        .build();
+
+    export const ceil = new FunctionBuilder("ceil")
+        .add1("number", n => Math.ceil(n))
+        .add1("null", () => null)
+        .vectorize(1, [0])
         .build();
 
     export const min: FunctionImpl = new FunctionBuilder("min")
@@ -433,7 +486,7 @@ export namespace DefaultFunctions {
         .vectorize(2, [1])
         .build();
 
-    // Case insensitive contains which looks for exact word matches (i.e., boundry-to-boundry match).
+    // Case insensitive contains which looks for exact word matches (i.e., boundary-to-boundary match).
     export const containsword: FunctionImpl = new FunctionBuilder("containsword")
         .add2(
             "string",
@@ -653,6 +706,18 @@ export namespace DefaultFunctions {
         .vectorize(3, [0])
         .build();
 
+    export const hash = new FunctionBuilder("hash")
+        .add2("string", "number", (seed, variant) => {
+            return cyrb53(seed, variant);
+        })
+        .add2("string", "string", (seed, text) => {
+            return cyrb53(seed + text);
+        })
+        .add3("string", "string", "number", (seed, text, variant) => {
+            return cyrb53(seed + text, variant);
+        })
+        .build();
+
     export const reduce = new FunctionBuilder("reduce")
         .add2("array", "string", (lis, op, context) => {
             if (lis.length == 0) return null;
@@ -743,6 +808,11 @@ export namespace DefaultFunctions {
         .add2("null", "*", () => null)
         .build();
 
+    export const unique = new FunctionBuilder("unique")
+        .add1("array", (arr, ctx) => DataArray.wrap(arr, ctx.settings).distinct().array())
+        .add1("null", () => null)
+        .build();
+
     export const map = new FunctionBuilder("map")
         .add2("array", "function", (arr, f, ctx) => arr.map(v => f(ctx, v)))
         .add2("null", "*", () => null)
@@ -763,36 +833,89 @@ export namespace DefaultFunctions {
             type: link.type,
         }))
         .build();
+
+    // Concatenates sub-array elements into a new array
+    export const flat = new FunctionBuilder("flat")
+        .add1("array", a => {
+            return a.flat();
+        })
+        .add2("array", "number", (a, n) => {
+            // @ts-ignore
+            return a.flat(n);
+        })
+        .add1("null", () => null)
+        .build();
+
+    // Slices the array into a new array
+    export const slice = new FunctionBuilder("slice")
+        .add1("array", a => {
+            return a.slice();
+        })
+        .add2("array", "number", (a, start) => {
+            return a.slice(start);
+        })
+        .add3("array", "number", "number", (a, start, end) => {
+            return a.slice(start, end);
+        })
+        .add1("null", () => null)
+        .build();
 }
 
 /** Default function implementations for the expression evaluator. */
+// Keep functions in same order as they're documented !!
 export const DEFAULT_FUNCTIONS: Record<string, FunctionImpl> = {
-    // Constructors.
+    // Constructors
+    object: DefaultFunctions.object,
     list: DefaultFunctions.list,
     array: DefaultFunctions.list,
+    date: DefaultFunctions.date,
+    dur: DefaultFunctions.dur,
+    number: DefaultFunctions.number,
+    string: DefaultFunctions.string,
     link: DefaultFunctions.link,
     embed: DefaultFunctions.embed,
     elink: DefaultFunctions.elink,
-    date: DefaultFunctions.date,
-    dur: DefaultFunctions.dur,
-    dateformat: DefaultFunctions.dateformat,
-    localtime: DefaultFunctions.localtime,
-    number: DefaultFunctions.number,
-    string: DefaultFunctions.string,
-    object: DefaultFunctions.object,
     typeof: DefaultFunctions.typeOf,
 
-    // Math Operations.
+    // Numeric Operations
     round: DefaultFunctions.round,
+    trunc: DefaultFunctions.trunc,
+    floor: DefaultFunctions.floor,
+    ceil: DefaultFunctions.ceil,
     min: DefaultFunctions.min,
     max: DefaultFunctions.max,
+    sum: DefaultFunctions.sum,
+    product: DefaultFunctions.product,
+    average: DefaultFunctions.average,
     minby: DefaultFunctions.minby,
     maxby: DefaultFunctions.maxby,
 
-    // String operations.
-    regexreplace: DefaultFunctions.regexreplace,
+    // Object, Arrays, and String operations
+    contains: DefaultFunctions.contains,
+    icontains: DefaultFunctions.icontains,
+    econtains: DefaultFunctions.econtains,
+    containsword: DefaultFunctions.containsword,
+    extract: DefaultFunctions.extract,
+    sort: DefaultFunctions.sort,
+    reverse: DefaultFunctions.reverse,
+    length: DefaultFunctions.length,
+    nonnull: DefaultFunctions.nonnull,
+    all: DefaultFunctions.all,
+    any: DefaultFunctions.any,
+    none: DefaultFunctions.none,
+    join: DefaultFunctions.join,
+    filter: DefaultFunctions.filter,
+    map: DefaultFunctions.map,
+    flat: DefaultFunctions.flat,
+    slice: DefaultFunctions.slice,
+    unique: DefaultFunctions.unique,
+
+    reduce: DefaultFunctions.reduce,
+
+    // String Operations
     regextest: DefaultFunctions.regextest,
     regexmatch: DefaultFunctions.regexmatch,
+    regexreplace: DefaultFunctions.regexreplace,
     replace: DefaultFunctions.replace,
     lower: DefaultFunctions.lower,
     upper: DefaultFunctions.upper,
@@ -804,35 +927,15 @@ export const DEFAULT_FUNCTIONS: Record<string, FunctionImpl> = {
     substring: DefaultFunctions.substring,
     truncate: DefaultFunctions.truncate,
 
-    // Date Operations.
-    striptime: DefaultFunctions.striptime,
-
-    // List operations.
-    length: DefaultFunctions.length,
-    contains: DefaultFunctions.contains,
-    icontains: DefaultFunctions.icontains,
-    econtains: DefaultFunctions.econtains,
-    containsword: DefaultFunctions.containsword,
-    reverse: DefaultFunctions.reverse,
-    sort: DefaultFunctions.sort,
-
-    // Aggregation operations like reduce.
-    reduce: DefaultFunctions.reduce,
-    join: DefaultFunctions.join,
-    sum: DefaultFunctions.sum,
-    product: DefaultFunctions.product,
-    average: DefaultFunctions.average,
-    all: DefaultFunctions.all,
-    any: DefaultFunctions.any,
-    none: DefaultFunctions.none,
-    filter: DefaultFunctions.filter,
-    map: DefaultFunctions.map,
-    nonnull: DefaultFunctions.nonnull,
-
-    // Object/Utility operations.
-    extract: DefaultFunctions.extract,
+    // Utility Operations
     default: DefaultFunctions.fdefault,
     ldefault: DefaultFunctions.ldefault,
     choice: DefaultFunctions.choice,
+    striptime: DefaultFunctions.striptime,
+    dateformat: DefaultFunctions.dateformat,
+    durationformat: DefaultFunctions.durationformat,
+    currencyformat: DefaultFunctions.currencyformat,
+    localtime: DefaultFunctions.localtime,
+    hash: DefaultFunctions.hash,
     meta: DefaultFunctions.meta,
 };

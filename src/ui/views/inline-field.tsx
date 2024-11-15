@@ -1,4 +1,4 @@
-import { extractInlineFields, parseInlineValue } from "data-import/inline-field";
+import { InlineField, extractInlineFields, parseInlineValue } from "data-import/inline-field";
 import { MarkdownPostProcessorContext, MarkdownRenderChild } from "obsidian";
 import { h, render } from "preact";
 import { DataviewContext, DataviewInit, Lit } from "ui/markdown";
@@ -6,10 +6,10 @@ import { canonicalizeVarName } from "util/normalize";
 
 /** Replaces raw textual inline fields in text containers with pretty HTML equivalents. */
 export async function replaceInlineFields(ctx: MarkdownPostProcessorContext, init: DataviewInit): Promise<void> {
-    let inlineFields = extractInlineFields(init.container.innerHTML);
+    const inlineFields = extractInlineFields(init.container.innerHTML);
     if (inlineFields.length == 0) return;
 
-    let component = new MarkdownRenderChild(init.container);
+    const component = new MarkdownRenderChild(init.container);
     ctx.addChild(component);
 
     // Iterate through the raw HTML and replace inline field matches with corresponding rendered values.
@@ -53,15 +53,37 @@ export async function replaceInlineFields(ctx: MarkdownPostProcessorContext, ini
     // Replace the container children with the new rendered children.
     // TODO: Replace this with a dom-to-dom diff to reduce the actual amount of updates.
     init.container.replaceChildren(...template.content.childNodes);
-
+    let inlineFieldsFromText: InlineField[] | undefined;
+    let hasRetrievedText: boolean = false;
     for (let index = 0; index < inlineFields.length; index++) {
         const box = init.container.querySelector("#dataview-inline-field-" + index);
         if (!box) continue;
 
         const context = Object.assign({}, init, { container: box, component: component });
+        const parseInlineValueWrapper = (fieldVal: string) => {
+            if (fieldVal.startsWith('<span class="math"')) {
+                // allows math symbols to be rendered in reading view
+                if (!hasRetrievedText) {
+                    hasRetrievedText = true;
+                    let text = ctx.getSectionInfo(init.container)?.text;
+                    if (text) {
+                        inlineFieldsFromText = extractInlineFields(text);
+                    }
+                }
+                if (!inlineFieldsFromText) return parseInlineValue(fieldVal);
+                return parseInlineValue(inlineFieldsFromText[index].value);
+            } else {
+                return parseInlineValue(fieldVal);
+            }
+        };
+
         render(
             <DataviewContext.Provider value={context}>
-                <Lit value={parseInlineValue(inlineFields[index].value)} inline={true} sourcePath={ctx.sourcePath} />
+                <Lit
+                    value={parseInlineValueWrapper(inlineFields[index].value)}
+                    inline={true}
+                    sourcePath={ctx.sourcePath}
+                />
             </DataviewContext.Provider>,
             box
         );

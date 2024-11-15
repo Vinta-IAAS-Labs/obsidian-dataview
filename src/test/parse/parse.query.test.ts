@@ -1,8 +1,25 @@
-import { TableQuery, ListQuery, CalendarQuery, SortByStep, QueryFields } from "query/query";
+import { TableQuery, ListQuery, CalendarQuery, SortByStep, QueryFields, Query } from "query/query";
 import { QUERY_LANGUAGE, parseQuery } from "query/parse";
 import { Sources } from "data-index/source";
 import { DEFAULT_QUERY_SETTINGS } from "settings";
 import { Fields } from "expression/field";
+
+function testQueryTypeAlone(name: string) {
+    const upper = name.toUpperCase();
+    const lower = name.toLowerCase();
+
+    function expectQ(q: Query) {
+        expect(q.header.type).toBe(lower);
+    }
+
+    const tests = [upper, lower].flatMap(type => ["", " ", "\n", " \n", "\n "].map(suffix => type + suffix));
+
+    test(`Just ${upper}`, () => {
+        for (const test of tests) {
+            expectQ(parseQuery(test).orElseThrow());
+        }
+    });
+}
 
 test("Parse Query Type", () => {
     let unknown = QUERY_LANGUAGE.queryType.parse("vehicle");
@@ -22,6 +39,39 @@ test("Link Source", () => {
         source: Sources.link("Stuff", true),
         settings: DEFAULT_QUERY_SETTINGS,
         operations: [],
+    });
+});
+
+// <-- Comments -->
+describe("Comments", () => {
+    test("Valid Comments", () => {
+        let commentWithSpace = QUERY_LANGUAGE.comment.tryParse("// This is a comment");
+        expect(commentWithSpace).toEqual("This is a comment");
+
+        let commentNoSpace = QUERY_LANGUAGE.comment.tryParse("//This is a comment");
+        expect(commentNoSpace).toEqual("This is a comment");
+
+        let empty = QUERY_LANGUAGE.comment.tryParse("//");
+        expect(empty).toEqual("");
+
+        let emptyWithSpace = QUERY_LANGUAGE.comment.tryParse("// ");
+        expect(emptyWithSpace).toEqual("");
+    });
+
+    test("Invalid comment in quotes", () => {
+        let commentSolo = QUERY_LANGUAGE.comment.parse('"// This is not a comment"');
+        if (!commentSolo.status) {
+            expect(commentSolo.expected).toEqual(["Not a comment"]);
+        } else {
+            fail("Solo comment should not have parsed");
+        }
+
+        let commentMiddle = QUERY_LANGUAGE.comment.parse('"The is before the comment // This is not a comment"');
+        if (!commentMiddle.status) {
+            expect(commentMiddle.expected).toEqual(["Not a comment"]);
+        } else {
+            fail("Comment in the middle of a string should not have parsed");
+        }
     });
 });
 
@@ -56,14 +106,20 @@ test("Sort Fields", () => {
 
 // <-- Full Queries -->
 
-test("Task query with no fields", () => {
-    let q = parseQuery("task from #games").orElseThrow();
-    expect(typeof q).toBe("object");
-    expect(q.header.type).toBe("task");
-    expect(q.source).toEqual(Sources.tag("#games"));
+describe("Task Queries", () => {
+    testQueryTypeAlone("task");
+
+    test("Task query with no fields", () => {
+        let q = parseQuery("task from #games").orElseThrow();
+        expect(typeof q).toBe("object");
+        expect(q.header.type).toBe("task");
+        expect(q.source).toEqual(Sources.tag("#games"));
+    });
 });
 
 describe("List Queries", () => {
+    testQueryTypeAlone("list");
+
     test("With Format", () => {
         let query = parseQuery("LIST file.name FROM #games").orElseThrow();
         expect(query.header.type).toBe("list");
@@ -79,6 +135,8 @@ describe("List Queries", () => {
 });
 
 describe("Table Queries", () => {
+    testQueryTypeAlone("table");
+
     test("Minimal Query", () => {
         let simple = parseQuery("TABLE time-played, rating, length FROM #games").orElseThrow();
         expect(simple.header.type).toBe("table");
@@ -102,6 +160,27 @@ describe("Table Queries", () => {
         expect((fat.header as TableQuery).fields.length).toBe(3);
         expect(fat.source).toEqual(Sources.binaryOp(Sources.tag("#games"), "|", Sources.tag("#gaming")));
         expect((fat.operations[1] as SortByStep).fields.length).toBe(2);
+    });
+
+    test("Commented Query", () => {
+        let commented = parseQuery(
+            "// This is a comment at the beginning\n" +
+                "TABLE (time-played + 100) as long, rating as rate, length\n" +
+                "// This is a comment\n" +
+                "// This is a second comment\n" +
+                "FROM #games or #gaming  // This is an inline comment\n" +
+                "// This is a third comment\n" +
+                "WHERE long > 150 and rate - 10 < 40\n" +
+                "// This is a fourth comment\n" +
+                "\n" +
+                "   // This is a comment with whitespace prior\n" +
+                "SORT length + 8 + 4 DESCENDING, long ASC\n" +
+                "// This is a comment at the end"
+        ).orElseThrow();
+        expect(commented.header.type).toBe("table");
+        expect((commented.header as TableQuery).fields.length).toBe(3);
+        expect(commented.source).toEqual(Sources.binaryOp(Sources.tag("#games"), "|", Sources.tag("#gaming")));
+        expect((commented.operations[1] as SortByStep).fields.length).toBe(2);
     });
 
     test("WITHOUT ID", () => {

@@ -13,6 +13,7 @@ import { Context } from "expression/context";
 import {
     defaultLinkHandler,
     executeCalendar,
+    executeInline,
     executeList,
     executeTable,
     executeTask,
@@ -29,7 +30,7 @@ import { createFixedListView, createListView } from "ui/views/list-view";
 import { createFixedTableView, createTableView } from "ui/views/table-view";
 import { Result } from "api/result";
 import { parseQuery } from "query/parse";
-import { tryOrPropogate } from "util/normalize";
+import { tryOrPropagate } from "util/normalize";
 import { Query } from "query/query";
 import { DataviewCalendarRenderer } from "ui/views/calendar-view";
 import { DataviewJSRenderer } from "ui/views/js-view";
@@ -98,19 +99,19 @@ export class DataviewApi {
         this.io = new DataviewIOApi(this);
     }
 
-    /** Utilities to check the current Dataview version and comapre it to SemVer version ranges. */
+    /** Utilities to check the current Dataview version and compare it to SemVer version ranges. */
     public version: {
         current: string;
         compare: (op: CompareOperator, ver: string) => boolean;
         satisfies: (range: string) => boolean;
     } = (() => {
-        const { verNum: version } = this;
+        const self = this;
         return {
             get current() {
-                return version;
+                return self.verNum;
             },
-            compare: (op: CompareOperator, ver: string) => compare(version, ver, op),
-            satisfies: (range: string) => satisfies(version, range),
+            compare: (op: CompareOperator, ver: string) => compare(this.verNum, ver, op),
+            satisfies: (range: string) => satisfies(this.verNum, range),
         };
     })();
 
@@ -355,19 +356,31 @@ export class DataviewApi {
      * ```
      *
      * This method returns a Result type instead of throwing an error; you can check the result of the
-     * execution via `result.successful` and obtain `result.value` or `result.error` resultingly. If
+     * execution via `result.successful` and obtain `result.value` or `result.error` accordingly. If
      * you'd rather this method throw on an error, use `dv.tryEvaluate`.
      */
-    public evaluate(expression: string, context?: DataObject): Result<Literal, string> {
+    public evaluate(expression: string, context?: DataObject, originFile?: string): Result<Literal, string> {
         let field = EXPRESSION.field.parse(expression);
         if (!field.status) return Result.failure(`Failed to parse expression "${expression}"`);
 
-        return this.evaluationContext.evaluate(field.value, context);
+        let evaluationContext = originFile
+            ? new Context(defaultLinkHandler(this.index, originFile), this.settings)
+            : this.evaluationContext;
+
+        return evaluationContext.evaluate(field.value, context);
     }
 
     /** Error-throwing version of `dv.evaluate`. */
-    public tryEvaluate(expression: string, context?: DataObject): Literal {
-        return this.evaluate(expression, context).orElseThrow();
+    public tryEvaluate(expression: string, context?: DataObject, originFile?: string): Literal {
+        return this.evaluate(expression, context, originFile).orElseThrow();
+    }
+
+    /** Evaluate an expression in the context of the given file. */
+    public evaluateInline(expression: string, origin: string): Result<Literal, string> {
+        let field = EXPRESSION.field.parse(expression);
+        if (!field.status) return Result.failure(`Failed to parse expression "${expression}"`);
+
+        return executeInline(field.value, origin, this.index, this.settings);
     }
 
     ///////////////
@@ -393,7 +406,7 @@ export class DataviewApi {
             return;
         }
 
-        let maybeQuery = tryOrPropogate(() => parseQuery(source));
+        let maybeQuery = tryOrPropagate(() => parseQuery(source));
 
         // In case of parse error, just render the error.
         if (!maybeQuery.successful) {
@@ -403,29 +416,36 @@ export class DataviewApi {
 
         let query = maybeQuery.value;
         let init = { app: this.app, settings: this.settings, index: this.index, container };
+        let childComponent;
         switch (query.header.type) {
             case "task":
-                component.addChild(createTaskView(init, query as Query, filePath));
+                childComponent = createTaskView(init, query as Query, filePath);
+                component.addChild(childComponent);
                 break;
             case "list":
-                component.addChild(createListView(init, query as Query, filePath));
+                childComponent = createListView(init, query as Query, filePath);
+                component.addChild(childComponent);
+
                 break;
             case "table":
-                component.addChild(createTableView(init, query as Query, filePath));
+                childComponent = createTableView(init, query as Query, filePath);
+
+                component.addChild(childComponent);
                 break;
             case "calendar":
-                component.addChild(
-                    new DataviewCalendarRenderer(
-                        query as Query,
-                        container,
-                        this.index,
-                        filePath,
-                        this.settings,
-                        this.app
-                    )
+                childComponent = new DataviewCalendarRenderer(
+                    query as Query,
+                    container,
+                    this.index,
+                    filePath,
+                    this.settings,
+                    this.app
                 );
+
+                component.addChild(childComponent);
                 break;
         }
+        childComponent.load();
     }
 
     /**
@@ -442,8 +462,9 @@ export class DataviewApi {
             renderCodeBlock(container, code, "javascript");
             return;
         }
-
-        component.addChild(new DataviewJSRenderer(this, code, container, filePath));
+        const renderer = new DataviewJSRenderer(this, code, container, filePath);
+        renderer.load();
+        component.addChild(renderer);
     }
 
     /** Render a dataview list of the given values. */
@@ -522,7 +543,7 @@ export class DataviewApi {
         filePath: string,
         inline: boolean = false
     ) {
-        return renderValue(value as Literal, container, filePath, component, this.settings, inline);
+        return renderValue(this.app, value as Literal, container, filePath, component, this.settings, inline);
     }
 
     /////////////////
@@ -587,6 +608,8 @@ export type QueryApiSettings = {
 
 /** Determines if source-path has a `?no-dataview` annotation that disables dataview. */
 export function isDataviewDisabled(sourcePath: string): boolean {
+    if (!sourcePath) return false;
+
     let questionLocation = sourcePath.lastIndexOf("?");
     if (questionLocation == -1) return false;
 

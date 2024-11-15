@@ -15,6 +15,9 @@ supports:
 - **Grouping** results based on fields
 - **Limiting** your result count
 
+!!! warning Differences to SQL
+    If you are familiar with SQL, please read [Differences to SQL](../../queries/differences-to-sql) to avoid confusing DQL with SQL.
+
 Let's have a look at how we can put DQL to use.
 
 ## General Format of a DQL Query
@@ -23,7 +26,7 @@ Every query follows the same structure and consists of
 
 - exactly one **Query Type** with zero, one or many [fields](../annotation/add-metadata.md), depending on query type
 - zero or one **FROM** data commands with one to many [sources](../reference/sources.md)
-- zero to many other **data commands** with one to many [expressions](../reference/expressions.md) and/or other infos depending on the data command 
+- zero to many other **data commands** with one to many [expressions](../reference/expressions.md) and/or other infos depending on the data command
 
 At a high level, a query conforms to the following pattern:
 
@@ -53,7 +56,7 @@ The output format of a query is determined by its **Query Type**. There are four
 The Query Type is the **only mandatory command in a query**. Everything else is optional.
 
 !!! attention "Possibly memory intense examples"
-    Depending on the size of your vault, executing the following examples can take long and even freeze Obsidian in extreme cases. It's recommended that you specify a `FROM` to restrict the query execution to a specific subset of your vaults' files. See next section.  
+    Depending on the size of your vault, executing the following examples can take long and even freeze Obsidian in extreme cases. It's recommended that you specify a `FROM` to restrict the query execution to a specific subset of your vaults' files. See next section.
 
 ~~~
 Lists all pages in your vault as a bullet point list
@@ -110,9 +113,9 @@ FROM (#assignment AND "30 School") OR ("30 School/32 Homeworks" AND outgoing([[S
 
 ## Filter, sort, group or limit results
 
-In addition to the Query Types and the **Data command** `FROM` that's explained above, you have several other **Data Commands** available that help you restrict, refine, sort or group your query results. 
+In addition to the Query Types and the **Data command** `FROM` that's explained above, you have several other **Data Commands** available that help you restrict, refine, sort or group your query results.
 
-All data commands except the `FROM` command can be used **multiple times in any order** (as long as they come after the Query Type and `FROM`, if `FROM` is used at all). They'll be excuted in the order they are written.
+All data commands except the `FROM` command can be used **multiple times in any order** (as long as they come after the Query Type and `FROM`, if `FROM` is used at all). They'll be executed in the order they are written.
 
 Available are:
 
@@ -139,7 +142,7 @@ SORT file.ctime DESC
 LIMIT 10
 ```
 
-Lists the 10 oldest and incompleted tasks of your vault as an interactive task list, grouped by their containing file and sorted from oldest to newest file.
+Lists the 10 oldest and incomplete tasks of your vault as an interactive task list, grouped by their containing file and sorted from oldest to newest file.
 ```dataview
 TASK
 WHERE !completed

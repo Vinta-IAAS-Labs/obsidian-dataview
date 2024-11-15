@@ -22,7 +22,7 @@ Get page information (via `dv.page()`) for the page the script is currently exec
 
 ### `dv.pages(source)`
 
-Take a single string argument, `source`, which is the same form as a [query language source](../../query/sources).
+Take a single string argument, `source`, which is the same form as a [query language source](../../reference/sources).
 Return a [data array](../data-array) of page objects, which are plain objects with all of the page fields as
 values.
 
@@ -135,6 +135,46 @@ views/custom
 View scripts have access to the `dv` object (the API object), and an `input` object which is exactly whatever the second
 argument of `dv.view()` was.
 
+Bear in mind, `dv.view()` cannot read from directories starting with a dot, like `.views`. Example of an incorrect usage:
+
+```js
+await dv.view(".views/view1", { arg1: 'a', arg2: 'b' });
+```
+Attempting this will yield the following exception:
+
+```
+Dataview: custom view not found for '.views/view1/view.js' or '.views/view1.js'.
+```
+
+Also note, directory paths always originate from the vault root.
+
+#### Example
+In this example, we have a custom script file named `view1.js` in the `scripts` directory. 
+
+**File:** `scripts/view1.js`
+```js
+console.log(`Loading view1`);
+
+function foo(...args) {
+  console.log('foo is called with args', ...args);
+}
+foo(input)
+```
+
+And we have an Obsidian document located under `projects`. We'll call `dv.view()` from this document using the `scripts/view1.js` path.
+
+**Document:** `projects/customViews.md`
+```js
+await dv.view("scripts/view1", { arg1: 'a', arg2: 'b' }) 
+```
+
+When the above script is executed, it will print the following:
+
+```
+Loading view1
+foo is called with args {arg1: 'a', arg2: 'b'}
+```
+
 ## Dataviews
 
 ### `dv.list(elements)`
@@ -150,8 +190,9 @@ dv.list(dv.pages("#book").where(p => p.rating > 7)) => list of all books with ra
 
 ### `dv.taskList(tasks, groupByFile)`
 
-Render a dataview list of `Task` objects, as obtained by `page.file.tasks`. Only the first argument is required; if the
-second argument `groupByFile` is provided (and is true), then tasks will be grouped by the file they come from automatically.
+Render a dataview list of `Task` objects, as obtained by `page.file.tasks`. By default, this view will automatically
+group the tasks by their origin file. If you provide `false` as a second argument explicitly, it will instead render them
+as a single unified list.
 
 ```js
 // List all tasks from pages marked '#project'
@@ -164,14 +205,33 @@ dv.taskList(dv.pages("#project").file.tasks
 // List all tasks tagged with '#tag' from pages marked #project
 dv.taskList(dv.pages("#project").file.tasks
     .where(t => t.text.includes("#tag")))
+
+// List all tasks from pages marked '#project', without grouping.
+dv.taskList(dv.pages("#project").file.tasks, false)
 ```
 
 ### `dv.table(headers, elements)`
 
-Render a dataview table with the given list of headers and 2D array of elements.
+Renders a dataview table. `headers` is an array of column headers. `elements` is an array of rows. Each row is itself an array of columns. Inside a row, every column which is an array will be rendered with bullet points.
 
 ```js
-// Render a simple table of book info sorted by rating.
+dv.table(
+	["Col1", "Col2", "Col3"],
+		[
+			["Row1", "Dummy", "Dummy"],
+			["Row2", 
+				["Bullet1",
+				 "Bullet2",
+				 "Bullet3"],
+			 "Dummy"],
+			["Row3", "Dummy", "Dummy"]
+		]
+	);
+```
+
+An example of how to render a simple table of book info sorted by rating.
+
+```js
 dv.table(["File", "Genre", "Time Read", "Rating"], dv.pages("#book")
     .sort(b => b.rating)
     .map(b => [b.file.link, b.genre, b["time-read"], b.rating]))
@@ -217,7 +277,7 @@ dv.paragraph(markdown);
 
 ### `dv.array(value)`
 
-Convert a given value or array into a Dataview [data array](data-array). If the value is already a data array, returns
+Convert a given value or array into a Dataview [data array](../data-array). If the value is already a data array, returns
 it unchanged.
 
 ```js
@@ -366,13 +426,13 @@ though will always be an object with a `type` denoting the return type. This ver
 
 ```javascript
 await dv.query("LIST FROM #tag") =>
-    Success { type: "list", values: [value1, value2, ...] }
+    { successful: true, value: { type: "list", values: [value1, value2, ...] } }
 
 await dv.query(`TABLE WITHOUT ID file.name, value FROM "path"`) =>
-    Success { type: "table", headers: ["file.name", "value"], values: [["A", 1], ["B", 2]] }
+    { successful: true, value: { type: "table", headers: ["file.name", "value"], values: [["A", 1], ["B", 2]] } }
 
 await dv.query("TASK WHERE due") =>
-    Success { type: "task", values: [task1, task2, ...]}
+    { successful: true, value: { type: "task", values: [task1, task2, ...] } }
 ```
 
 `dv.query` accepts two additional, optional arguments:
@@ -392,7 +452,7 @@ Equivalent to `dv.query()`, but returns rendered Markdown.
 
 ```js
 await dv.queryMarkdown("LIST FROM #tag") =>
-    Success { "- [[Page 1]]\n- [[Page 2]]" }
+    { successful: true, value: { "- [[Page 1]]\n- [[Page 2]]" } }
 ```
 
 ### ⌛ `dv.tryQueryMarkdown(source, [file], [settings])`

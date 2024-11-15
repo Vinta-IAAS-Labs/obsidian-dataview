@@ -1,3 +1,113 @@
+# 0.5.67
+
+Includes several documentation fixes and several community-contributed bug fixes.
+
+- @reply2za: Fixed inline rendering in the reading view.
+- @carlesalbasboix: Adds sum(), avg(), min(), and max() to data arrays.
+- @mnaoumov: Adds code mirror configuration which code highlights dataviewjs!
+
+---
+
+# 0.5.66
+
+Bugfix for version comparisons to fix some other plugins having broken interactions with Dataview.
+
+---
+
+# 0.5.65
+
+A maintenance update which fixes some issues with rendering embeds in Dataviews and adds a few new functions.
+
+- Adds the `hash()` function for generating consistent uniformly-distributed values given arbitrary inputs. Primarily useful for creating "random" views which remain consistent across page refreshes. Thanks to @holroy.
+- Adds the `slice()` function for slicing arrays, similar to Javascript's `Array.slice`. Thanks to @holroy.
+- Fixes several issues with rendering embeds inside dataviews. Thanks to @GottZ.
+- Several documentation improvements around tasks - thanks to @holroy and @RaviOnline.
+
+---
+
+# 0.5.64
+
+More bug fixes for inline field rendering.
+
+
+---
+
+# 0.5.63
+
+- More bugfixes from @RyotaUshio for rendering Markdown paragraphs and other blocks in DataviewJS.
+
+---
+
+# 0.5.62
+
+Several more inline field fixes from @RyotaUshio, including more configuration options, fixing inline fields being rendered inside codeblocks, and more. Thanks!
+
+---
+
+# 0.5.61
+
+- @RyotaUshio: Fix several bugs related to the new inline field rendering, including source mode and fixing date formatting.
+
+---
+
+# 0.5.60
+
+- @RyotaUshio: Add explicit rendering of inline fields in live preview. They are much more visually distinct now!
+- @MarioRicalde: Adds `PluginApi#evaluateInline(expression, path)` to the plugin API, which evaluate expressions as if you were on the given page.
+
+---
+
+# 0.5.59
+
+- Fix an issue with the plugin failing to run on iOS due to an esoteric regex issue.
+
+---
+
+# 0.5.58
+
+- Negative durations will now be properly rendered.
+
+---
+
+# 0.5.57
+
+Maintenance patch which bumps many internal dependency versions and which includes approximately ~20 community-contributed PRs which add some new functions, fix some Dataview interactions with properties, and more!
+
+---
+
+# Unreleased
+
+- DQL: Adds new `durationformat(duration, string)` function.
+- DQL: New math rounding functions, `trunc(number)`, `floor(number)`, `ceil(number)`.
+
+# 0.5.56
+
+- Includes some performance fixes on recent versions of Obsidian 1.3+ due to some API changes. Thanks @kometenstaub.
+- Documentation cleanups and improvements by @mocsa, @protofarer, @seanlzx, and @somidad.
+- Adds the new `flat(array)` method for flattening nested arrays, as well as parsing dates using arbitrary formats using
+  `date(text, "format")`. Thanks @holroy!
+
+---
+
+# 0.5.55
+
+- Durations are now internationalized using luxon's new internationalization support.
+- Dataviews should now properly render inside Canvas and some other contexts. Thanks @GamerGirlandCo!
+
+---
+
+# 0.5.54
+
+- Regular list items are now also clickable in task views, not just task lines! Thanks to @LilaRest.
+
+---
+
+# 0.5.53
+
+- Fix some documentation issues causing docs to not be updated.
+
+---
+
 # 0.5.52
 
 Substantial documentation improvements thanks to @s-blu and @AB1908!
@@ -160,7 +270,7 @@ inline queries in codeblocks.
 
 # 0.5.32
 
-The Dataview API has been noticably revamped - there are now approximately twice as many functions available on the
+The Dataview API has been noticeably revamped - there are now approximately twice as many functions available on the
 plugin API as there were before, and some additional utilities have been added to both the plugin and inline API. I
 will be finishing up the associated new "extension" functionality shortly, which will allow:
 
@@ -278,7 +388,7 @@ A long-overdue swap from the beta branch to the stable branch. The beta branch s
 changes, and has some nice performance improvements that come along with it! Here are the major changes:
 
 - Most views now use React and no longer flicker when updating; this is not the case yet for DataviewJS, which will be
-  getting equivalent treament in the future.
+  getting equivalent treatment in the future.
 - Dataview now caches metadata, so Dataview loads are very fast after the first time you open your vault. Dataview still
   needs to visit every file when you update the plugin version, so that should be the only times you experience slower
   load times.
@@ -437,7 +547,7 @@ Iterative beta which adds a few nice QoL features and fixes some more bugs:
 - Some issues with array and object rendering were corrected.
 - Error messages on empty dataview results were improved and now show up for all views.
 
-Inline images are now rendered correctly in Dataview tables and lists - no more hacky `app://local/` schenanigans!
+Inline images are now rendered correctly in Dataview tables and lists - no more hacky `app://local/` shenanigans!
 
 ---
 
@@ -450,7 +560,7 @@ Inline images are now rendered correctly in Dataview tables and lists - no more 
 # 0.5.1 (Beta)
 
 - Temporarily revert the new task metadata behavior: inline fields in sublists of tasks are added to the page, instead
-  of the task. This behavior is not good, but is compatible with legacy usages of task metadata, which should uinbreak
+  of the task. This behavior is not good, but is compatible with legacy usages of task metadata, which should not break
   some existing queries.
     - This behavior will be removed in the future behind a flag.
 - Added the 'visual' field to tasks - if set, tasks render 'visual' instead of their regular text.

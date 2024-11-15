@@ -2,7 +2,6 @@ import nodeResolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 import webWorker from "rollup-plugin-web-worker-loader";
 import copy from "rollup-plugin-copy";
-import ttypescript from "ttypescript";
 import typescript2 from "rollup-plugin-typescript2";
 
 const BASE_CONFIG = {
@@ -14,6 +13,7 @@ const BASE_CONFIG = {
         warn(warning);
     },
 };
+
 const getRollupPlugins = (tsconfig, ...plugins) =>
     [
         typescript2(tsconfig),
@@ -65,7 +65,7 @@ const LIBRARY_CONFIG = {
         name: "Dataview (Library)",
     },
     plugins: getRollupPlugins(
-        { tsconfig: "tsconfig-lib.json", typescript: ttypescript },
+        { tsconfig: "tsconfig-lib.json" },
         copy({ targets: [{ src: "src/typings/*.d.ts", dest: "lib/typings" }] })
     ),
 };

@@ -35,6 +35,14 @@ export function parsePage(path: string, contents: string, stat: FileStats, metad
         }
     }
 
+    // Add frontmatter links to links.
+    if (metadata.frontmatterLinks) {
+        for (let rawLink of metadata.frontmatterLinks || []) {
+            const link = Link.infer(rawLink.link, false, rawLink.displayText);
+            links.push(link);
+        }
+    }
+
     // Links in metadata.
     const linksByLine: Record<number, Link[]> = {};
     for (let rawLink of metadata.links || []) {
@@ -171,7 +179,7 @@ export function parseMarkdown(
     return { fields, lists };
 }
 
-// TODO: Consider using an actual parser in leiu of a more expensive regex.
+// TODO: Consider using an actual parser in lieu of a more expensive regex.
 export const LIST_ITEM_REGEX = /^[\s>]*(\d+\.|\d+\)|\*|-|\+)\s*(\[.{0,1}\])?\s*(.*)$/mu;
 
 /**
@@ -258,7 +266,7 @@ export function parseLists(
         cache[item.line] = item;
     }
 
-    // Tree updating passes. Update child lists. Propogate metadata up to parent tasks. Update task `fullyCompleted`.
+    // Tree updating passes. Update child lists. Propagate metadata up to parent tasks. Update task `fullyCompleted`.
     let literals: Map<string, Literal[]> = new Map();
     for (let listItem of Object.values(cache)) {
         // Pass 1: Update child lists.
@@ -267,11 +275,11 @@ export function parseLists(
             parent.children.push(listItem.line);
         }
 
-        // Pass 2: Propogate metadata up to the parent task or root element.
+        // Pass 2: Propagate metadata up to the parent task or root element.
         if (!listItem.task) {
             mergeFieldGroups(literals, listItem.fields);
 
-            // TODO (blacksmithgu): The below code properly propogates metadata up to the nearest task, which is the
+            // TODO (blacksmithgu): The below code properly Propagates metadata up to the nearest task, which is the
             // more intuitive behavior. For now, though, we will keep the existing logic.
             /*
             let root: ListItem | undefined = listItem;
@@ -282,7 +290,7 @@ export function parseLists(
             */
         }
 
-        // Pass 3: Propogate `fullyCompleted` up the task tree. This is a little less efficient than just doing a simple
+        // Pass 3: Propagate `fullyCompleted` up the task tree. This is a little less efficient than just doing a simple
         // DFS using the children IDs, but it's probably fine.
         if (listItem.task) {
             let curr: ListItem | undefined = listItem;
@@ -327,6 +335,9 @@ export function parseFrontmatter(value: any): Literal {
             }
 
             return result;
+        } else if (value instanceof Date) {
+            let dateParse = DateTime.fromJSDate(value);
+            return dateParse;
         } else {
             let object = value as Record<string, any>;
             let result: Record<string, Literal> = {};

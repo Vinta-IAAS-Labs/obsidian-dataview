@@ -66,7 +66,7 @@ Over many a quaint and curious volume of forgotten lore—
 In terms of indexed metadata (or what you can query), they are identical, and only differ in their annotation style. How you want to [annotate your  metadata](annotation/add-metadata.md) is up to you and your personal preference. With this file, you'd have the **metadata field** `author` available and everything Dataview provides you [automatically as implicit fields](annotation/metadata-pages.md), like the tag or note title. 
 
 !!! attention "Data needs to be indexed"
-    In the above example, you _do not_ have the poem itself available in Dataview: It is a paragraph, no metadata field and nothing Dataview indexes automatically. It is not part of Dataviews index, so you won't be able to query it.
+    In the above example, you _do not_ have the poem itself available in Dataview: It is a paragraph, not a metadata field and not something Dataview indexes automatically. It is not part of Dataviews index, so you won't be able to query it.
 
 ### Data Querying
 
@@ -74,7 +74,7 @@ You can access **indexed data** with the help of **Queries**.
 
 There are **three different ways** you can write a Query: With help of the [Dataview Query Language](queries/dql-js-inline/#dataview-query-language-dql), as an [inline statement](queries/dql-js-inline#inline-dql) or in the most flexible but most complex way: as a [Javascript Query](queries/dql-js-inline#dataview-js). 
 
-The **Dataview Query Language** (**DQL**) gives you a broad and powerful toolbelt to query, display and operate on your data. An [**inline query**](queries/dql-js-inline#inline-dql) gives you the possibility to display exactly one indexed value anywhere in your note. You can also do calculations this way. With **DQL** at your hands, you'll be probably fine without any Javascript throurough your data journey.
+The **Dataview Query Language** (**DQL**) gives you a broad and powerful toolbelt to query, display and operate on your data. An [**inline query**](queries/dql-js-inline#inline-dql) gives you the possibility to display exactly one indexed value anywhere in your note. You can also do calculations this way. With **DQL** at your hands, you'll be probably fine without any Javascript through your data journey.
 
 A DQL Query consists of several parts:
 

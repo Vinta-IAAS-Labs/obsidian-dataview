@@ -13,6 +13,7 @@ import {
     QueryType,
     SortByStep,
     WhereStep,
+    Comment,
 } from "./query";
 import { Source, Sources } from "data-index/source";
 import { DEFAULT_QUERY_SETTINGS } from "settings";
@@ -25,6 +26,7 @@ import { Result } from "api/result";
 /** Typings for the outputs of all of the parser combinators. */
 interface QueryLanguageTypes {
     queryType: QueryType;
+    comment: Comment;
 
     explicitNamedField: NamedField;
     namedField: NamedField;
@@ -62,6 +64,12 @@ function stripNewlines(text: string): string {
         .join("");
 }
 
+/** Given `parser`, return the parser that returns `if_eof()` if EOF is found,
+ * otherwise `parser` preceded by (non-optional) whitespace */
+function precededByWhitespaceIfNotEof<T>(if_eof: (_: undefined) => T, parser: P.Parser<T>): P.Parser<T> {
+    return P.eof.map(if_eof).or(P.whitespace.then(parser));
+}
+
 /** A parsimmon-powered parser-combinator implementation of the query language. */
 export const QUERY_LANGUAGE = P.createLanguage<QueryLanguageTypes>({
     // Simple atom parsing, like words, identifiers, numbers.
@@ -76,6 +84,16 @@ export const QUERY_LANGUAGE = P.createLanguage<QueryLanguageTypes>({
             EXPRESSION.identifier.or(EXPRESSION.string),
             (field, _as, ident) => QueryFields.named(ident, field)
         ),
+    comment: () =>
+        P.Parser((input, i) => {
+            // Parse a comment, which is a line starting with //.
+            let line = input.substring(i);
+            if (!line.startsWith("//")) return P.makeFailure(i, "Not a comment");
+            // The comment ends at the end of the line.
+            line = line.split("\n")[0];
+            let comment = line.substring(2).trim();
+            return P.makeSuccess(i + line.length, comment);
+        }),
     namedField: q =>
         P.alt<NamedField>(
             q.explicitNamedField,
@@ -98,45 +116,53 @@ export const QUERY_LANGUAGE = P.createLanguage<QueryLanguageTypes>({
 
     headerClause: q =>
         q.queryType
-            .skip(P.whitespace)
-            .chain(qtype => {
-                switch (qtype) {
-                    case "table":
-                        return P.seqMap(
-                            P.regexp(/WITHOUT\s+ID/i)
-                                .skip(P.optWhitespace)
-                                .atMost(1),
-                            P.sepBy(q.namedField, P.string(",").trim(P.optWhitespace)),
-                            (withoutId, fields) => {
-                                return { type: "table", fields, showId: withoutId.length == 0 } as QueryHeader;
-                            }
+            .chain(type => {
+                switch (type) {
+                    case "table": {
+                        return precededByWhitespaceIfNotEof(
+                            () => ({ type, fields: [], showId: true }),
+                            P.seqMap(
+                                P.regexp(/WITHOUT\s+ID/i)
+                                    .skip(P.optWhitespace)
+                                    .atMost(1),
+                                P.sepBy(q.namedField, P.string(",").trim(P.optWhitespace)),
+                                (withoutId, fields) => {
+                                    return { type, fields, showId: withoutId.length == 0 };
+                                }
+                            )
                         );
+                    }
                     case "list":
-                        return P.seqMap(
-                            P.regexp(/WITHOUT\s+ID/i)
-                                .skip(P.optWhitespace)
-                                .atMost(1),
-                            EXPRESSION.field.atMost(1),
-                            (withoutId, format) => {
-                                return {
-                                    type: "list",
-                                    format: format.length == 1 ? format[0] : undefined,
-                                    showId: withoutId.length == 0,
-                                } as QueryHeader;
-                            }
+                        return precededByWhitespaceIfNotEof(
+                            () => ({ type, format: undefined, showId: true }),
+                            P.seqMap(
+                                P.regexp(/WITHOUT\s+ID/i)
+                                    .skip(P.optWhitespace)
+                                    .atMost(1),
+                                EXPRESSION.field.atMost(1),
+                                (withoutId, format) => {
+                                    return {
+                                        type,
+                                        format: format.length == 1 ? format[0] : undefined,
+                                        showId: withoutId.length == 0,
+                                    };
+                                }
+                            )
                         );
                     case "task":
-                        return P.succeed({ type: "task" } as QueryHeader);
+                        return P.succeed({ type });
                     case "calendar":
-                        return P.seqMap(q.namedField, field => {
-                            return {
-                                type: "calendar",
-                                showId: true,
-                                field,
-                            } as QueryHeader;
-                        });
+                        return P.whitespace.then(
+                            P.seqMap(q.namedField, field => {
+                                return {
+                                    type,
+                                    showId: true,
+                                    field,
+                                } as QueryHeader;
+                            })
+                        );
                     default:
-                        return P.fail(`Unrecognized query type '${qtype}'`);
+                        return P.fail(`Unrecognized query type '${type}'`);
                 }
             })
             .desc("TABLE or LIST or TASK or CALENDAR"),
@@ -170,9 +196,9 @@ export const QUERY_LANGUAGE = P.createLanguage<QueryLanguageTypes>({
     clause: q => P.alt(q.fromClause, q.whereClause, q.sortByClause, q.limitClause, q.groupByClause, q.flattenClause),
     query: q =>
         P.seqMap(
-            q.headerClause.trim(P.optWhitespace),
-            q.fromClause.trim(P.optWhitespace).atMost(1),
-            q.clause.trim(P.optWhitespace).many(),
+            q.headerClause.trim(optionalWhitespaceOrComment),
+            q.fromClause.trim(optionalWhitespaceOrComment).atMost(1),
+            q.clause.trim(optionalWhitespaceOrComment).many(),
             (header, from, clauses) => {
                 return {
                     header,
@@ -183,6 +209,14 @@ export const QUERY_LANGUAGE = P.createLanguage<QueryLanguageTypes>({
             }
         ),
 });
+
+/**
+ * A parser for optional whitespace or comments. This is used to exclude whitespace and comments from other parsers.
+ */
+const optionalWhitespaceOrComment: P.Parser<string> = P.alt(P.whitespace, QUERY_LANGUAGE.comment)
+    .many() // Use many() since there may be zero whitespaces or comments.
+    // Transform the many to a single result.
+    .map(arr => arr.join(""));
 
 /**
  * Attempt to parse a query from the given query text, returning a string error

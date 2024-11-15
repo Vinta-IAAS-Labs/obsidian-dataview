@@ -171,7 +171,7 @@ export class DataviewInlineApi {
      * Note that `this` is implicitly available and refers to the current file.
      *
      * This method returns a Result type instead of throwing an error; you can check the result of the
-     * execution via `result.successful` and obtain `result.value` or `result.error` resultingly. If
+     * execution via `result.successful` and obtain `result.value` or `result.error` accordingly. If
      * you'd rather this method throw on an error, use `dv.tryEvaluate`.
      */
     public evaluate(expression: string, context?: DataObject): Result<Literal, string> {
@@ -208,7 +208,7 @@ export class DataviewInlineApi {
         return this.api.array(raw);
     }
 
-    /** Return true if theg given value is a javascript array OR a dataview data array. */
+    /** Return true if the given value is a javascript array OR a dataview data array. */
     public isArray(raw: any): raw is DataArray<any> | Array<any> {
         return this.api.isArray(raw);
     }
@@ -288,7 +288,7 @@ export class DataviewInlineApi {
         }
 
         let _el = container.createEl(el, options);
-        renderValue(wrapped.value, _el, this.currentFilePath, this.component, this.settings, true);
+        renderValue(this.app, wrapped.value, _el, this.currentFilePath, this.component, this.settings, true);
         return _el;
     }
 
@@ -316,48 +316,45 @@ export class DataviewInlineApi {
      */
     public async view(viewName: string, input: any) {
         // Look for `${viewName}.js` first, then for `${viewName}/view.js`.
-        let simpleViewFile = this.app.metadataCache.getFirstLinkpathDest(viewName + ".js", this.currentFilePath);
-        if (simpleViewFile) {
-            let contents = await this.app.vault.read(simpleViewFile);
-            if (contents.contains("await")) contents = "(async () => { " + contents + " })()";
-            let func = new Function("dv", "input", contents);
-
-            try {
-                // This may directly render, in which case it will likely return undefined or null.
-                let result = await Promise.resolve(func(this, input));
-                if (result)
-                    await renderValue(
-                        result as any,
-                        this.container,
-                        this.currentFilePath,
-                        this.component,
-                        this.settings,
-                        true
-                    );
-            } catch (ex) {
-                renderErrorPre(this.container, `Dataview: Failed to execute view '${simpleViewFile.path}'.\n\n${ex}`);
-            }
-
-            return;
+        const simpleViewPath = `${viewName}.js`;
+        const complexViewPath = `${viewName}/view.js`;
+        let checkForCss = false;
+        let cssElement = undefined;
+        let viewFile = this.app.metadataCache.getFirstLinkpathDest(simpleViewPath, this.currentFilePath);
+        if (!viewFile) {
+            viewFile = this.app.metadataCache.getFirstLinkpathDest(complexViewPath, this.currentFilePath);
+            checkForCss = true;
         }
-
-        // No `{viewName}.js`, so look for a folder instead.
-        let viewPath = `${viewName}/view.js`;
-        let viewFile = this.app.metadataCache.getFirstLinkpathDest(viewPath, this.currentFilePath);
 
         if (!viewFile) {
-            renderErrorPre(this.container, `Dataview: custom view not found for '${viewPath}' or '${viewName}.js'.`);
+            renderErrorPre(
+                this.container,
+                `Dataview: custom view not found for '${simpleViewPath}' or '${complexViewPath}'.`
+            );
             return;
         }
 
-        let viewContents = await this.app.vault.read(viewFile);
-        if (viewContents.contains("await")) viewContents = "(async () => { " + viewContents + " })()";
-        let viewFunction = new Function("dv", "input", viewContents);
+        if (checkForCss) {
+            // Check for optional CSS.
+            let cssFile = this.app.metadataCache.getFirstLinkpathDest(`${viewName}/view.css`, this.currentFilePath);
+            if (cssFile) {
+                let cssContents = await this.app.vault.read(cssFile);
+                cssContents += `\n/*# sourceURL=${location.origin}/${cssFile.path} */`;
+                cssElement = this.container.createEl("style", { text: cssContents, attr: { scope: " " } });
+            }
+        }
+
+        let contents = await this.app.vault.read(viewFile);
+        if (contents.contains("await")) contents = "(async () => { " + contents + " })()";
+        contents += `\n//# sourceURL=${viewFile.path}`;
+        let func = new Function("dv", "input", contents);
 
         try {
-            let result = await Promise.resolve(viewFunction(this, input));
+            // This may directly render, in which case it will likely return undefined or null.
+            let result = await Promise.resolve(func(this, input));
             if (result)
                 await renderValue(
+                    this.app,
                     result as any,
                     this.container,
                     this.currentFilePath,
@@ -366,15 +363,9 @@ export class DataviewInlineApi {
                     true
                 );
         } catch (ex) {
-            renderErrorPre(this.container, `Dataview: Error while executing view '${viewFile.path}'.\n\n${ex}`);
+            if (cssElement) this.container.removeChild(cssElement);
+            renderErrorPre(this.container, `Dataview: Failed to execute view '${viewFile.path}'.\n\n${ex}`);
         }
-
-        // Check for optional CSS.
-        let cssFile = this.app.metadataCache.getFirstLinkpathDest(`${viewName}/view.css`, this.currentFilePath);
-        if (!cssFile) return;
-
-        let cssContents = await this.app.vault.read(cssFile);
-        this.container.createEl("style", { text: cssContents, attr: { scope: " " } });
     }
 
     /** Render a dataview list of the given values. */

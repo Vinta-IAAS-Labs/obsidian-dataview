@@ -1,4 +1,4 @@
-import { Component, MarkdownRenderer } from "obsidian";
+import { App, Component, MarkdownRenderer } from "obsidian";
 import { DataArray } from "api/data-array";
 import { QuerySettings } from "settings";
 import { currentLocale } from "util/locale";
@@ -7,13 +7,14 @@ import { Literal, Values, Widgets } from "data-model/value";
 
 /** Render simple fields compactly, removing wrapping content like paragraph and span. */
 export async function renderCompactMarkdown(
+    app: App,
     markdown: string,
     container: HTMLElement,
     sourcePath: string,
     component: Component
 ) {
     let subcontainer = container.createSpan();
-    await MarkdownRenderer.renderMarkdown(markdown, subcontainer, sourcePath, component);
+    await MarkdownRenderer.render(app, markdown, subcontainer, sourcePath, component);
 
     let paragraph = subcontainer.querySelector(":scope > p");
     if (subcontainer.children.length == 1 && paragraph) {
@@ -43,6 +44,7 @@ export type ValueRenderContext = "root" | "list";
 
 /** Prettily render a value into a container with the given settings. */
 export async function renderValue(
+    app: App,
     field: Literal,
     container: HTMLElement,
     originFile: string,
@@ -50,7 +52,8 @@ export async function renderValue(
     settings: QuerySettings,
     expandList: boolean = false,
     context: ValueRenderContext = "root",
-    depth: number = 0
+    depth: number = 0,
+    isInlineFieldLivePreview: boolean = false
 ) {
     // Prevent infinite recursion.
     if (depth > settings.maxRecursiveRenderDepth) {
@@ -59,22 +62,44 @@ export async function renderValue(
     }
 
     if (Values.isNull(field)) {
-        await renderCompactMarkdown(settings.renderNullAs, container, originFile, component);
+        await renderCompactMarkdown(app, settings.renderNullAs, container, originFile, component);
     } else if (Values.isDate(field)) {
         container.appendText(renderMinimalDate(field, settings, currentLocale()));
     } else if (Values.isDuration(field)) {
         container.appendText(renderMinimalDuration(field));
     } else if (Values.isString(field) || Values.isBoolean(field) || Values.isNumber(field)) {
-        await renderCompactMarkdown("" + field, container, originFile, component);
+        await renderCompactMarkdown(app, "" + field, container, originFile, component);
     } else if (Values.isLink(field)) {
-        await renderCompactMarkdown(field.markdown(), container, originFile, component);
+        await renderCompactMarkdown(app, field.markdown(), container, originFile, component);
     } else if (Values.isHtml(field)) {
         container.appendChild(field);
     } else if (Values.isWidget(field)) {
         if (Widgets.isListPair(field)) {
-            await renderValue(field.key, container, originFile, component, settings, expandList, context, depth);
+            await renderValue(
+                app,
+                field.key,
+                container,
+                originFile,
+                component,
+                settings,
+                expandList,
+                context,
+                depth,
+                isInlineFieldLivePreview
+            );
             container.appendText(": ");
-            await renderValue(field.value, container, originFile, component, settings, expandList, context, depth);
+            await renderValue(
+                app,
+                field.value,
+                container,
+                originFile,
+                component,
+                settings,
+                expandList,
+                context,
+                depth,
+                isInlineFieldLivePreview
+            );
         } else if (Widgets.isExternalLink(field)) {
             let elem = document.createElement("a");
             elem.textContent = field.display ?? field.url;
@@ -99,7 +124,18 @@ export async function renderValue(
             });
             for (let child of field) {
                 let li = list.createEl("li", { cls: "dataview-result-list-li" });
-                await renderValue(child, li, originFile, component, settings, expandList, "list", depth + 1);
+                await renderValue(
+                    app,
+                    child,
+                    li,
+                    originFile,
+                    component,
+                    settings,
+                    expandList,
+                    "list",
+                    depth + 1,
+                    isInlineFieldLivePreview
+                );
             }
         } else {
             if (field.length == 0) {
@@ -113,7 +149,18 @@ export async function renderValue(
                 if (first) first = false;
                 else span.appendText(", ");
 
-                await renderValue(val, span, originFile, component, settings, expandList, "list", depth + 1);
+                await renderValue(
+                    app,
+                    val,
+                    span,
+                    originFile,
+                    component,
+                    settings,
+                    expandList,
+                    "list",
+                    depth + 1,
+                    isInlineFieldLivePreview
+                );
             }
         }
     } else if (Values.isObject(field)) {
@@ -128,7 +175,18 @@ export async function renderValue(
             for (let [key, value] of Object.entries(field)) {
                 let li = list.createEl("li", { cls: ["dataview", "dataview-li", "dataview-result-object-li"] });
                 li.appendText(key + ": ");
-                await renderValue(value, li, originFile, component, settings, expandList, "list", depth + 1);
+                await renderValue(
+                    app,
+                    value,
+                    li,
+                    originFile,
+                    component,
+                    settings,
+                    expandList,
+                    "list",
+                    depth + 1,
+                    isInlineFieldLivePreview
+                );
             }
         } else {
             if (Object.keys(field).length == 0) {
@@ -143,7 +201,18 @@ export async function renderValue(
                 else span.appendText(", ");
 
                 span.appendText(key + ": ");
-                await renderValue(value, span, originFile, component, settings, expandList, "list", depth + 1);
+                await renderValue(
+                    app,
+                    value,
+                    span,
+                    originFile,
+                    component,
+                    settings,
+                    expandList,
+                    "list",
+                    depth + 1,
+                    isInlineFieldLivePreview
+                );
             }
         }
     } else {

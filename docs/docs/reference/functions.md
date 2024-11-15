@@ -1,6 +1,6 @@
 # Functions
 
-Dataview functions provide more advanced ways to manipulate data. You can use functions **in [data commands](../queries/data-commands.md)** (except FROM) to filter or group or use them **as [additional informations](../queries/query-types.md)** like TABLE columns or extra output for LIST queries to see your data in a new light.
+Dataview functions provide more advanced ways to manipulate data. You can use functions **in [data commands](../queries/data-commands.md)** (except FROM) to filter or group or use them **as [additional information](../queries/query-types.md)** like TABLE columns or extra output for LIST queries to see your data in a new light.
 
 ## How functions work
 
@@ -10,7 +10,7 @@ Functions are another form of [expression](expressions.md) and can be used every
 functionname(parameter1, parameter2)
 ```
 
-Parameters are again [expressions](expressions.md) and you can use literals, meta data fields, or even another function as parameter. You'll find out which [data type](../annotation/types-of-metadata.md) your parameters need to have on the documentation of this page. Pay attention to the information inside the function brackets. Parameters in square brackets, i.e. `link(path, [display])` means they are *optional* and can be omitted. Find out more about the default behaviour of each function on their explanation. 
+Parameters are again [expressions](expressions.md) and you can use literals, meta data fields, or even another function as parameter. You'll find out which [data type](../annotation/types-of-metadata.md) your parameters need to have on the documentation of this page. Pay attention to the information inside the function brackets. Parameters in square brackets, i.e. `link(path, [display])` means they are *optional* and can be omitted. Find out more about the default behavior of each function on their explanation.
 
 ## Calling functions on lists of values
 
@@ -26,7 +26,7 @@ replace("yes", "e", "a") = "yas"
 replace(["yes", "ree"], "e", "a") = ["yas", "raa"]
 ```
 
-This so-called "function vectorization" will not be mentioned explicitly on the following definitions and is possible for a wide range of these functionalities implicitly. 
+This so-called "function vectorization" will not be mentioned explicitly on the following definitions and is possible for a wide range of these functionalities implicitly.
 
 ## Constructors
 
@@ -45,12 +45,12 @@ object("a", 4, "c", "yes") => object which maps a to 4, and c to "yes"
 
 ### `list(value1, value2, ...)`
 
-Creates a new list with the given values in it.
+Creates a new list with the given values in it. `array` can be used an alias for `list`.
 
 ```js
 list() => empty list
 list(1, 2, 3) => list with 1, 2, and 3
-list("a", "b", "c") => list with "a", "b", and "c"
+array("a", "b", "c") => list with "a", "b", and "c"
 ```
 
 ### `date(any)`
@@ -59,7 +59,18 @@ Parses a date from the provided string, date, or link object, if possible, retur
 
 ```js
 date("2020-04-18") = <date object representing April 18th, 2020>
-date([[2021-04-16]]) = <date object for the given page, refering to file.day>
+date([[2021-04-16]]) = <date object for the given page, referring to file.day>
+```
+
+### `date(text, format)`
+
+Parses a date from text to luxon `DateTime` with the specified format. Note localized formats might not work.
+Uses [Luxon tokens](https://moment.github.io/luxon/#/formatting?id=table-of-tokens).
+
+```js
+date("12/31/2022", "MM/dd/yyyy") => DateTime for December 31th, 2022
+date("210313", "yyMMdd") => DateTime for March 13th, 2021
+date("946778645000", "x") => DateTime for "2000-01-02T03:04:05"
 ```
 
 ### `dur(any)`
@@ -147,8 +158,40 @@ Round a number to a given number of digits. If the second argument is not specif
 otherwise, rounds to the given number of digits.
 
 ```js
-round(16.555555) = 7
+round(16.555555) = 17
 round(16.555555, 2) = 16.56
+```
+
+### `trunc(number)`
+
+Truncates ("cuts off") the decimal point from a number.
+
+```js
+trunc(12.937) = 12
+trunc(-93.33333) = -93
+trunc(-0.837764) = 0
+```
+
+### `floor(number)`
+
+Always rounds down and returns the largest integer less than or equal to a given number.
+This means that negative numbers become more negative.
+
+```js
+floor(12.937) = 12
+floor(-93.33333) = -94
+floor(-0.837764) = -1
+```
+
+### `ceil(number)`
+
+Always rounds up and returns the smallest integer greater than or equal to a given number.
+This means negative numbers become less negative.
+
+```js
+ceil(12.937) = 13
+ceil(-93.33333) = -93
+ceil(-0.837764) = 0
 ```
 
 ### `min(a, b, ..)`
@@ -175,7 +218,7 @@ max("a", "ab", "abc") = "abc"
 
 ### `sum(array)`
 
-Sums all numeric values in the array. If you have null values in your average, you can eliminate them via the `nonnull` function.
+Sums all numeric values in the array. If you have null values in your sum, you can eliminate them via the `nonnull` function.
 
 ```js
 sum([1, 2, 3]) = 6
@@ -193,6 +236,20 @@ product([1,2,3]) = 6
 product([]) = null
 
 product(nonnull([null, 1, 2, 4])) = 8
+```
+
+### `reduce(array, operand)`
+
+A generic function to reduce a list into a single value, valid operands are `"+"`, `"-"`, `"*"`, `"/"` and the boolean operands `"&"` and `"|"`. Note that using `"+"` and `"*"` equals the `sum()` and `product()` functions, and using `"&"` and `"|"` matches `all()` and `any()`.
+
+```js
+reduce([100, 20, 3], "-") = 77
+reduce([200, 10, 2], "/") = 10
+reduce(values, "*") = Multiplies every element of values, same as product(values)
+reduce(values, this.operand) = Applies the local field operand to each of the values
+reduce(["⭐", 3], "*") = "⭐⭐⭐", same as "⭐" * 3
+
+reduce([1]), "+") = 1, has the side effect of reducing the list into a single element
 ```
 
 ### `average(array)`
@@ -315,10 +372,10 @@ The outputs are different for different types of input, see examples.
     containsword("word", "word") = true
     containsword("word", "Word") = true
     containsword("words", "Word") = false
-    containsword("Hello there!, "hello") = true
-    containsword("Hello there!, "HeLLo") = true
-    containsword("Hello there chaps!, "chap") = false
-    containsword("Hello there chaps!, "chaps") = true
+    containsword("Hello there!", "hello") = true
+    containsword("Hello there!", "HeLLo") = true
+    containsword("Hello there chaps!", "chap") = false
+    containsword("Hello there chaps!", "chaps") = true
     ```
 
 - For lists, it returns a list of booleans indicating if the word's exact case insensitive match was found.
@@ -462,6 +519,30 @@ Applies the function to each element in the array, returning a list of the mappe
 ```js
 map([1, 2, 3], (x) => x + 2) = [3, 4, 5]
 map(["yes", "no"], (x) => x + "?") = ["yes?", "no?"]
+```
+
+### `flat(array, [depth])`
+
+Concatenates sub-levels of the array to the desired depth. Default is 1 level, but it can
+concatenate multiple levels. E.g. Can be used to reduce array depth on `rows` lists after
+doing `GROUP BY`.
+
+```js
+flat(list(1, 2, 3, list(4, 5), 6)) => list(1, 2, 3, 4, 5, 6)
+flat(list(1, list(21, 22), list(list (311, 312, 313))), 4) => list(1, 21, 22, 311, 312, 313)
+flat(rows.file.outlinks)) => All the file outlinks at first level in output
+```
+
+### `slice(array, [start, [end]])`
+
+Returns a shallow copy of a portion of an array into a new array object selected from `start`
+to `end` (`end` not included) where `start` and `end` represents the index of items in that array.
+
+```js
+slice([1, 2, 3, 4, 5], 3) = [4, 5] => All items from given position, 0 as first
+slice(["ant", "bison", "camel", "duck", "elephant"], 0, 2) = ["ant", "bison"] => First two items
+slice([1, 2, 3, 4, 5], -2) = [4, 5] => counts from the end, last two items
+slice(someArray) => a copy of someArray
 ```
 
 ---
@@ -633,6 +714,25 @@ choice(false, "yes", "no") = "no"
 choice(x > 4, y, z) = y if x > 4, else z
 ```
 
+### `hash(seed, [text], [variant])`
+
+Generate a hash based on the `seed`, and the optional extra `text` or a variant `number`. The function
+generates a fixed number based on the combination of these parameters, which can be used to randomize
+the sort order of files or lists/tasks. If you choose a `seed` based on a date, i.e. "2024-03-17",
+or another timestamp, i.e. "2024-03-17 19:13", you can make the "randomness" be fixed
+related to that timestamp. `variant` is a number, which in some cases is needed to make the combination of
+`text` and `variant` become unique.
+
+```js
+hash(dateformat(date(today), "YYYY-MM-DD"), file.name) = ... A unique value for a given date in time
+hash(dateformat(date(today), "YYYY-MM-DD"), file.name, position.start.line) = ... A unique "random" value in a TASK query
+```
+
+This function can be used in a `SORT` statement to randomize the order. If you're using a `TASK` query,
+since the file name could be the same for multiple tasks, you can add some number like the starting line
+number (as shown above) to make it a unique combination. If using something like `FLATTEN file.lists as item`,
+the similar addition would be to do `item.position.start.line` as the last parameter.
+
 ### `striptime(date)`
 
 Strip the time component of a date, leaving only the year, month, and day. Good for date comparisons if you don't care
@@ -645,14 +745,50 @@ striptime(file.mtime) = file.mday
 
 ### `dateformat(date|datetime, string)`
 
-Format a Dataview date using a formatting string.
-Uses [Luxon tokens](https://moment.github.io/luxon/#/formatting?id=table-of-tokens).
+Format a Dataview date using a formatting string. Uses [Luxon tokens](https://moment.github.io/luxon/#/formatting?id=table-of-tokens).
 
 ```js
 dateformat(file.ctime,"yyyy-MM-dd") = "2022-01-05"
 dateformat(file.ctime,"HH:mm:ss") = "12:18:04"
 dateformat(date(now),"x") = "1407287224054"
 dateformat(file.mtime,"ffff") = "Wednesday, August 6, 2014, 1:07 PM Eastern Daylight Time"
+```
+
+**Note:** `dateformat()` returns a string, not a date, so you can't compare it against the result from a call to `date()` or a variable like `file.day` which already is a date. To make those comparisons you can format both arguments.
+
+### `durationformat(duration, string)`
+
+Format a Dataview duration using a formatting string.
+Anything inside single quotes will not be treated as a token and
+instead will be shown in the output as written. See examples.
+
+You may use these tokens:
+
+- `S` for milliseconds
+- `s` for seconds
+- `m` for minutes
+- `h` for hours
+- `d` for days
+- `w` for weeks
+- `M` for months
+- `y` for years
+
+```js
+durationformat(dur("3 days 7 hours 43 seconds"), "ddd'd' hh'h' ss's'") = "003d 07h 43s"
+durationformat(dur("365 days 5 hours 49 minutes"), "yyyy ddd hh mm ss") = "0001 000 05 49 00"
+durationformat(dur("2000 years"), "M months") = "24000 months"
+durationformat(dur("14d"), "s 'seconds'") = "1209600 seconds"
+```
+
+### `currencyformat(number, [currency])`
+
+Presents the number depending on your current locale, according to the `currency` code, from [ISO 4217](https://en.wikipedia.org/wiki/ISO_4217#List_of_ISO_4217_currency_codes).
+
+```
+number = 123456.789
+currencyformat(number, "EUR") =  €123,456.79  in locale: en_US)
+currencyformat(number, "EUR") =  123.456,79 € in locale: de_DE)
+currencyformat(number, "EUR") =  € 123 456,79 in locale: nb)
 ```
 
 ### `localtime(date)`

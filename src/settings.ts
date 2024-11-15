@@ -23,7 +23,7 @@ export interface QuerySettings {
     refreshInterval: number;
     /** The default format that dates are rendered in (using luxon's moment-like formatting). */
     defaultDateFormat: string;
-    /** The default format that date-times are rendered in (using luxons moment-like formatting). */
+    /** The default format that date-times are rendered in (using luxon's moment-like formatting). */
     defaultDateTimeFormat: string;
     /** Maximum depth that objects will be expanded when being rendered recursively. */
     maxRecursiveRenderDepth: number;
@@ -84,8 +84,10 @@ export interface DataviewSettings extends QuerySettings, ExportSettings {
     enableInlineDataview: boolean;
     /** Enable or disable executing inline DataviewJS queries. */
     enableInlineDataviewJs: boolean;
-    /** Enable or disable rendering inline fields prettily. */
+    /** Enable or disable rendering inline fields prettily in Reading View. */
     prettyRenderInlineFields: boolean;
+    /** Enable or disable rendering inline fields prettily in Live Preview. */
+    prettyRenderInlineFieldsInLivePreview: boolean;
     /** The keyword for DataviewJS blocks. */
     dataviewJsKeyword: string;
 }
@@ -102,6 +104,7 @@ export const DEFAULT_SETTINGS: DataviewSettings = {
         enableDataviewJs: false,
         enableInlineDataviewJs: false,
         prettyRenderInlineFields: true,
+        prettyRenderInlineFieldsInLivePreview: true,
         dataviewJsKeyword: "dataviewjs",
     },
 };
